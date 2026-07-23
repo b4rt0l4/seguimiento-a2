@@ -18,6 +18,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Comandos:\n"
         "/examen <nombre> <realizados> <aprobados> — Registrar examenes de hoy\n"
         "/examen <nombre> <realizados> <aprobados> <YYYY-MM-DD> — En una fecha\n"
+        "/grafana — Ver dashboard con graficas\n"
+        "/formulario — Abrir formulario web\n"
         "/ayuda — Mostrar este mensaje\n\n"
         f"Personas disponibles: {nombres}"
     )
@@ -80,6 +82,22 @@ async def examen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def grafana(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+    await update.message.reply_text(
+        "https://ardentjunco2055.grafana.net/public-dashboards/a422b02d9fd5446b8c312001b179737b"
+    )
+
+
+async def formulario(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+    await update.message.reply_text(
+        "https://seguimiento-a2.onrender.com"
+    )
+
+
 def main():
     ensure_schema()
     asyncio.set_event_loop(asyncio.new_event_loop())
@@ -87,6 +105,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ayuda", ayuda))
     app.add_handler(CommandHandler("examen", examen))
+    app.add_handler(CommandHandler("grafana", grafana))
+    app.add_handler(CommandHandler("formulario", formulario))
     app.run_polling()
 
 
