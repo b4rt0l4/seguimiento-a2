@@ -160,6 +160,7 @@ ORDER BY e.fecha
 SELECT e.fecha AS time, p.nombre AS metric,
   ROUND(SUM(e.num_aprobados)::numeric / SUM(e.num_examenes) * 100, 1) AS ratio
 FROM examenes e JOIN persona p ON e.persona_id = p.id
+WHERE $__timeFilter(e.fecha)
 GROUP BY e.fecha, p.nombre
 ORDER BY e.fecha
 ```
