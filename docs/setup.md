@@ -264,6 +264,8 @@ ORDER BY fecha
 - `/start` o `/ayuda` — muestra ayuda y personas disponibles
 - `/examen <nombre> <realizados> <aprobados>` — registra examenes de hoy
 - `/examen <nombre> <realizados> <aprobados> <YYYY-MM-DD>` — registra en una fecha concreta
+- `/grafana` — devuelve el link al dashboard publico con las graficas
+- `/formulario` — devuelve el link al formulario web de entrada de datos
 - Validaciones: persona debe existir en la tabla, fecha no futura, examenes > 0, aprobados entre 0 y examenes
 
 ---
