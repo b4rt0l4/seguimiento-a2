@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 
 from telegram import Update
@@ -8,6 +9,8 @@ from src.db import registrar_examen, buscar_persona_por_nombre, obtener_personas
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
     personas = obtener_personas()
     nombres = ", ".join(p["nombre"] for p in personas)
     await update.message.reply_text(
@@ -25,6 +28,8 @@ async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def examen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
     args = context.args
     if not args or len(args) < 3:
         await update.message.reply_text(
@@ -77,6 +82,7 @@ async def examen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     ensure_schema()
+    asyncio.set_event_loop(asyncio.new_event_loop())
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ayuda", ayuda))
