@@ -78,16 +78,22 @@ Este documento explica como registrarse en cada servicio, configurar las credenc
 
 Ir a **Dashboards > New Dashboard**. Para cada panel: Add visualization, seleccionar datasource PostgreSQL, cambiar a modo **Code** y pegar la query.
 
+Nota sobre paneles con barras (Bar chart): para que muestren todas las fechas del rango (incluso sin datos), las queries usan `generate_series` + `CROSS JOIN persona` + `LEFT JOIN examenes` con `COALESCE(..., 0)`.
+
 #### Panel 1 — Examenes por dia
 ```sql
-SELECT e.fecha AS time,
-  SUM(e.num_examenes) FILTER (WHERE p.nombre = 'Rafa') AS "Rafa",
-  SUM(e.num_examenes) FILTER (WHERE p.nombre = 'Sergio') AS "Sergio"
-FROM examenes e JOIN persona p ON e.persona_id = p.id
-GROUP BY e.fecha
-ORDER BY e.fecha
+SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(e.num_examenes), 0) AS examenes
+FROM generate_series(
+  $__timeFrom()::date,
+  $__timeTo()::date,
+  '1 day'::interval
+) AS d(fecha)
+CROSS JOIN persona p
+LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
+GROUP BY d.fecha, p.nombre
+ORDER BY d.fecha
 ```
-- Visualization: **Time series**, Graph styles > Style: **Bars**, Stack series: **Normal**
+- Visualization: **Bar chart**
 
 #### Panel 2 — Examenes acumulado total
 ```sql
@@ -101,12 +107,18 @@ ORDER BY e.fecha
 
 #### Panel 3 — Aprobados por dia
 ```sql
-SELECT e.fecha AS time, p.nombre AS metric, SUM(e.num_aprobados) AS aprobados
-FROM examenes e JOIN persona p ON e.persona_id = p.id
-GROUP BY e.fecha, p.nombre
-ORDER BY e.fecha
+SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(e.num_aprobados), 0) AS aprobados
+FROM generate_series(
+  $__timeFrom()::date,
+  $__timeTo()::date,
+  '1 day'::interval
+) AS d(fecha)
+CROSS JOIN persona p
+LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
+GROUP BY d.fecha, p.nombre
+ORDER BY d.fecha
 ```
-- Visualization: **Time series**, Connect null values: **Always**
+- Visualization: **Bar chart**
 
 #### Panel 4 — Aprobados acumulado total
 ```sql
@@ -120,12 +132,18 @@ ORDER BY e.fecha
 
 #### Panel 5 — Suspensos por dia
 ```sql
-SELECT e.fecha AS time, p.nombre AS metric, SUM(e.num_examenes - e.num_aprobados) AS suspensos
-FROM examenes e JOIN persona p ON e.persona_id = p.id
-GROUP BY e.fecha, p.nombre
-ORDER BY e.fecha
+SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(e.num_examenes - e.num_aprobados), 0) AS suspensos
+FROM generate_series(
+  $__timeFrom()::date,
+  $__timeTo()::date,
+  '1 day'::interval
+) AS d(fecha)
+CROSS JOIN persona p
+LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
+GROUP BY d.fecha, p.nombre
+ORDER BY d.fecha
 ```
-- Visualization: **Time series**, Connect null values: **Always**
+- Visualization: **Bar chart**
 
 #### Panel 6 — Suspensos acumulado total
 ```sql
