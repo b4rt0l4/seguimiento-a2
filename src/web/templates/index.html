@@ -89,6 +89,9 @@
         document.getElementById("num_examenes").addEventListener("change", function() {
             document.getElementById("num_aprobados").max = this.value;
         });
+        if (window.location.search) {
+            history.replaceState(null, '', '/');
+        }
     </script>
 </body>
 </html>
