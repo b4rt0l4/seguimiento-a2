@@ -49,6 +49,7 @@ fecha DATE NOT NULL, acertada BOOLEAN NOT NULL
 - El bot de Telegram solo permite registrar examenes de personas con `puede_examenes = true`.
 - La API de pregunta del dia solo acepta personas con `puede_pregunta = true`.
 - Validaciones (en backend y en BD): fecha no futura, examenes > 0, 0 <= aprobados <= examenes.
+- Las validaciones de "fecha no futura" en el servidor web usan `Europe/Madrid` como zona horaria (Render corre en UTC).
 
 ### API para sistema externo
 - Endpoint: `POST /api/pregunta`
@@ -136,3 +137,4 @@ seguimiento-a2/
 - El fichero CLAUDE.md sirve como contexto para cualquier LLM que continue el trabajo.
 - Ante cambios de requisitos, actualizar este fichero primero.
 - Importante: usar siempre la URL del connection pooler de Supabase (pooler.supabase.com:6543), no la conexion directa (db.xxx.supabase.co:5432). La directa no es accesible desde servicios externos como Render o Grafana Cloud.
+- Render corre en UTC. Para que las validaciones de fecha funcionen correctamente para usuarios en España, se usa `ZoneInfo("Europe/Madrid")` en vez de `date.today()` en `src/web/app.py`.

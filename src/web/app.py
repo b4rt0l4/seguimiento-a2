@@ -1,5 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Form, Header, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -35,7 +36,7 @@ async def index(request: Request, msg: str = "", msg_type: str = ""):
         name="index.html",
         context={
             "personas": obtener_personas(TipoPersona.EXAMENES),
-            "hoy": date.today().isoformat(),
+            "hoy": datetime.now(ZoneInfo("Europe/Madrid")).date().isoformat(),
             "message": message,
         },
     )
@@ -53,7 +54,7 @@ async def registrar(
     except ValueError:
         return RedirectResponse(f"/?msg={quote('Fecha invalida.')}&msg_type=error", status_code=303)
 
-    if fecha_parsed > date.today():
+    if fecha_parsed > datetime.now(ZoneInfo("Europe/Madrid")).date():
         return RedirectResponse(f"/?msg={quote('La fecha no puede ser posterior a hoy.')}&msg_type=error", status_code=303)
 
     if num_examenes < 1:
@@ -96,7 +97,7 @@ async def api_pregunta(request: Request, authorization: str = Header(None)):
     except ValueError:
         return JSONResponse({"error": "Formato de fecha invalido. Usa YYYY-MM-DD"}, status_code=400)
 
-    if fecha > date.today():
+    if fecha > datetime.now(ZoneInfo("Europe/Madrid")).date():
         return JSONResponse({"error": "La fecha no puede ser posterior a hoy"}, status_code=400)
 
     if not isinstance(acertada, bool):
