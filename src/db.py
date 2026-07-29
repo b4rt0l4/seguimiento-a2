@@ -84,6 +84,14 @@ def ensure_schema():
             cur.execute("ALTER TABLE persona ENABLE ROW LEVEL SECURITY")
             cur.execute("ALTER TABLE examenes ENABLE ROW LEVEL SECURITY")
             cur.execute("ALTER TABLE pregunta_dia ENABLE ROW LEVEL SECURITY")
+            for tabla in ("persona", "examenes", "pregunta_dia"):
+                cur.execute(f"""
+                    DO $$ BEGIN
+                        CREATE POLICY app_full_access ON {tabla}
+                            FOR ALL TO postgres USING (true) WITH CHECK (true);
+                    EXCEPTION WHEN duplicate_object THEN NULL;
+                    END $$;
+                """)
         conn.commit()
 
 
