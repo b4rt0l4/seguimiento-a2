@@ -81,6 +81,9 @@ def ensure_schema():
             cur.execute(SEED_PERSONAS)
             cur.execute(CREATE_EXAMENES)
             cur.execute(CREATE_PREGUNTA_DIA)
+            cur.execute("ALTER TABLE persona ENABLE ROW LEVEL SECURITY")
+            cur.execute("ALTER TABLE examenes ENABLE ROW LEVEL SECURITY")
+            cur.execute("ALTER TABLE pregunta_dia ENABLE ROW LEVEL SECURITY")
         conn.commit()
 
 
