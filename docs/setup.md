@@ -22,8 +22,9 @@ Este documento explica como registrarse en cada servicio, configurar las credenc
 
 ### Importante
 - Usar siempre la URL del **connection pooler** (`pooler.supabase.com:6543`), NO la conexion directa (`db.xxx.supabase.co:5432`). La directa no es accesible desde Render ni Grafana Cloud.
-- Las tablas (`persona` y `examenes`) se crean automaticamente al arrancar la app.
-- Las personas iniciales (Rafa y Sergio) se insertan automaticamente si no existen.
+- Las tablas (`persona`, `examenes` y `pregunta_dia`) se crean automaticamente al arrancar la app.
+- Las personas iniciales (Rafa y Sergio) se insertan automaticamente con `puede_examenes = true` y `puede_pregunta = true`.
+- Cada persona tiene flags `puede_examenes` y `puede_pregunta` (default false) que controlan en que funcionalidades participa.
 
 ---
 
@@ -41,8 +42,9 @@ Este documento explica como registrarse en cada servicio, configurar las credenc
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `uvicorn src.web.app:app --host 0.0.0.0 --port $PORT`
    - **Instance type**: Free
-4. Anadir variable de entorno en **Environment**:
+4. Anadir variables de entorno en **Environment**:
    - `DATABASE_URL` → la URI del pooler de Supabase
+   - `API_KEY` → clave secreta para la API de pregunta del dia (generar con `python -c "import secrets; print(secrets.token_urlsafe(32))"`)
 5. Deploy — Render asigna una URL publica automaticamente (ej: `https://tu-nombre.onrender.com`)
 
 ### Nota sobre el free tier
@@ -184,6 +186,61 @@ ORDER BY fecha
 - Visualization: **Time series**, Connect null values: **Always**
 - Standard options > Unit: **Misc > Percent (0-100)**
 
+#### Panel 9 — Aciertos pregunta del dia por dia
+```sql
+SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END), 0) AS aciertos
+FROM generate_series(
+  $__timeFrom()::date,
+  $__timeTo()::date,
+  '1 day'::interval
+) AS d(fecha)
+CROSS JOIN persona p
+LEFT JOIN pregunta_dia q ON q.fecha = d.fecha AND q.persona_id = p.id
+WHERE p.puede_pregunta = true
+GROUP BY d.fecha, p.nombre
+ORDER BY d.fecha
+```
+- Visualization: **Bar chart**
+
+#### Panel 10 — Aciertos pregunta del dia acumulado
+```sql
+SELECT q.fecha AS time, p.nombre AS metric,
+  SUM(SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END)) OVER (PARTITION BY p.nombre ORDER BY q.fecha) AS acumulado
+FROM pregunta_dia q JOIN persona p ON q.persona_id = p.id
+GROUP BY q.fecha, p.nombre
+ORDER BY q.fecha
+```
+- Visualization: **Time series**, Connect null values: **Always**
+
+#### Panel 11 — Ratio aciertos pregunta del dia (%)
+```sql
+SELECT q.fecha AS time, p.nombre AS metric,
+  ROUND(SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100, 1) AS ratio
+FROM pregunta_dia q JOIN persona p ON q.persona_id = p.id
+WHERE $__timeFilter(q.fecha)
+GROUP BY q.fecha, p.nombre
+ORDER BY q.fecha
+```
+- Visualization: **Time series**, Connect null values: **Always**
+- Standard options > Unit: **Misc > Percent (0-100)**
+
+#### Panel 12 — Ratio aciertos pregunta del dia acumulado (%)
+```sql
+SELECT fecha AS time, metric,
+  ROUND(SUM(aciertos) OVER w::numeric / SUM(total) OVER w * 100, 1) AS ratio
+FROM (
+  SELECT q.fecha, p.nombre AS metric,
+    SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END) AS aciertos,
+    COUNT(*) AS total
+  FROM pregunta_dia q JOIN persona p ON q.persona_id = p.id
+  GROUP BY q.fecha, p.nombre
+) sub
+WINDOW w AS (PARTITION BY metric ORDER BY fecha)
+ORDER BY fecha
+```
+- Visualization: **Time series**, Connect null values: **Always**
+- Standard options > Unit: **Misc > Percent (0-100)**
+
 ### Configurar dashboard
 - Rango de tiempo por defecto: seleccionar **Last 7 days** y al guardar marcar **"Save current time range as dashboard default"**
 - Compartir: Dashboard settings > **Make public** > habilitar **Time range picker enabled** para que los visitantes puedan filtrar por fechas
@@ -191,7 +248,47 @@ ORDER BY fecha
 
 ---
 
-## 4. Telegram Bot
+## 4. API pregunta del dia
+
+### Endpoint
+```
+POST /api/pregunta
+```
+
+### Autenticacion
+Header `Authorization: Bearer <API_KEY>`. La API_KEY se configura como variable de entorno.
+
+### Body (JSON)
+```json
+{
+  "persona": "Rafa",
+  "fecha": "2026-07-29",
+  "acertada": true
+}
+```
+
+### Validaciones
+- La persona debe existir y tener `puede_pregunta = true`
+- La fecha no puede ser posterior a hoy
+- `acertada` debe ser `true` o `false`
+
+### Ejemplo con curl
+```bash
+curl -X POST https://seguimiento-a2.onrender.com/api/pregunta \
+  -H "Authorization: Bearer TU_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"persona": "Rafa", "fecha": "2026-07-29", "acertada": true}'
+```
+
+### Respuestas
+- `200`: `{"ok": true, "mensaje": "Rafa — acertada el 2026-07-29"}`
+- `401`: API key invalida o ausente
+- `400`: campos faltantes, fecha invalida o futura
+- `404`: persona no encontrada o sin permiso de pregunta
+
+---
+
+## 5. Telegram Bot
 
 ### Crear el bot
 1. Abrir Telegram y buscar @BotFather
@@ -262,16 +359,17 @@ ORDER BY fecha
    ```
 
 ### Comandos del bot
-- `/start` o `/ayuda` — muestra ayuda y personas disponibles
+- `/start` o `/ayuda` — muestra ayuda con los comandos disponibles
 - `/examen <nombre> <realizados> <aprobados>` — registra examenes de hoy
 - `/examen <nombre> <realizados> <aprobados> <YYYY-MM-DD>` — registra en una fecha concreta
+- `/personas` — ver personas que pueden registrar examenes
 - `/grafana` — devuelve el link al dashboard publico con las graficas
 - `/formulario` — devuelve el link al formulario web de entrada de datos
-- Validaciones: persona debe existir en la tabla, fecha no futura, examenes > 0, aprobados entre 0 y examenes
+- Validaciones: persona debe existir en la tabla con `puede_examenes = true`, fecha no futura, examenes > 0, aprobados entre 0 y examenes
 
 ---
 
-## 5. Desarrollo local
+## 6. Desarrollo local
 
 ### Configuracion
 ```bash
@@ -281,7 +379,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Editar .env con las credenciales reales (URL pooler de Supabase + token bot)
+# Editar .env con las credenciales reales (URL pooler de Supabase + token bot + API key)
 ```
 
 ### Arrancar la web en local

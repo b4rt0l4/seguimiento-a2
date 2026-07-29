@@ -1,11 +1,19 @@
 from datetime import date
 from urllib.parse import quote
 
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Form, Header, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from src.db import registrar_examen, obtener_personas, ensure_schema
+from src.config import API_KEY
+from src.db import (
+    TipoPersona,
+    buscar_persona_por_nombre,
+    ensure_schema,
+    obtener_personas,
+    registrar_examen,
+    registrar_pregunta,
+)
 
 app = FastAPI(title="Seguimiento A2")
 
@@ -26,7 +34,7 @@ async def index(request: Request, msg: str = "", msg_type: str = ""):
         request=request,
         name="index.html",
         context={
-            "personas": obtener_personas(),
+            "personas": obtener_personas(TipoPersona.EXAMENES),
             "hoy": date.today().isoformat(),
             "message": message,
         },
@@ -56,7 +64,47 @@ async def registrar(
 
     registrar_examen(persona_id, fecha_parsed, num_examenes, num_aprobados)
 
-    personas = obtener_personas()
+    personas = obtener_personas(TipoPersona.EXAMENES)
     nombre = next((p["nombre"] for p in personas if p["id"] == persona_id), "?")
     msg = f"Registrado: {nombre} — {num_examenes} examen(es), {num_aprobados} aprobado(s) el {fecha}"
     return RedirectResponse(f"/?msg={quote(msg)}&msg_type=success", status_code=303)
+
+
+@app.post("/api/pregunta")
+async def api_pregunta(request: Request, authorization: str = Header(None)):
+    if not API_KEY:
+        return JSONResponse({"error": "API no configurada"}, status_code=500)
+
+    if not authorization or authorization != f"Bearer {API_KEY}":
+        return JSONResponse({"error": "No autorizado"}, status_code=401)
+
+    body = await request.json()
+
+    nombre = body.get("persona")
+    fecha_str = body.get("fecha")
+    acertada = body.get("acertada")
+
+    if not nombre or fecha_str is None or acertada is None:
+        return JSONResponse({"error": "Campos requeridos: persona, fecha, acertada"}, status_code=400)
+
+    persona = buscar_persona_por_nombre(nombre, TipoPersona.PREGUNTA)
+    if not persona:
+        return JSONResponse({"error": f"Persona '{nombre}' no encontrada o no participa en pregunta del dia"}, status_code=404)
+
+    try:
+        fecha = date.fromisoformat(fecha_str)
+    except ValueError:
+        return JSONResponse({"error": "Formato de fecha invalido. Usa YYYY-MM-DD"}, status_code=400)
+
+    if fecha > date.today():
+        return JSONResponse({"error": "La fecha no puede ser posterior a hoy"}, status_code=400)
+
+    if not isinstance(acertada, bool):
+        return JSONResponse({"error": "El campo acertada debe ser true o false"}, status_code=400)
+
+    registrar_pregunta(persona["id"], fecha, acertada)
+
+    return JSONResponse({
+        "ok": True,
+        "mensaje": f"{persona['nombre']} — {'acertada' if acertada else 'fallada'} el {fecha.isoformat()}",
+    })

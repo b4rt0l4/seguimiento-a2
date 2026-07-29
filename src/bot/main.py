@@ -5,23 +5,21 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from src.config import TELEGRAM_BOT_TOKEN
-from src.db import registrar_examen, buscar_persona_por_nombre, obtener_personas, ensure_schema
+from src.db import TipoPersona, registrar_examen, buscar_persona_por_nombre, obtener_personas, ensure_schema
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-    personas = obtener_personas()
-    nombres = ", ".join(p["nombre"] for p in personas)
     await update.message.reply_text(
         "Bot de seguimiento A2.\n\n"
         "Comandos:\n"
         "/examen <nombre> <realizados> <aprobados> — Registrar examenes de hoy\n"
         "/examen <nombre> <realizados> <aprobados> <YYYY-MM-DD> — En una fecha\n"
+        "/personas — Ver personas disponibles\n"
         "/grafana — Ver dashboard con graficas\n"
         "/formulario — Abrir formulario web\n"
-        "/ayuda — Mostrar este mensaje\n\n"
-        f"Personas disponibles: {nombres}"
+        "/ayuda — Mostrar este mensaje"
     )
 
 
@@ -40,9 +38,9 @@ async def examen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     nombre = args[0]
-    persona = buscar_persona_por_nombre(nombre)
+    persona = buscar_persona_por_nombre(nombre, TipoPersona.EXAMENES)
     if not persona:
-        personas = obtener_personas()
+        personas = obtener_personas(TipoPersona.EXAMENES)
         nombres = ", ".join(p["nombre"] for p in personas)
         await update.message.reply_text(
             f"Persona '{nombre}' no encontrada.\nPersonas disponibles: {nombres}"
@@ -82,6 +80,14 @@ async def examen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def personas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+    lista = obtener_personas(TipoPersona.EXAMENES)
+    nombres = "\n".join(f"- {p['nombre']}" for p in lista)
+    await update.message.reply_text(f"Personas que pueden registrar examenes:\n{nombres}")
+
+
 async def grafana(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -105,6 +111,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ayuda", ayuda))
     app.add_handler(CommandHandler("examen", examen))
+    app.add_handler(CommandHandler("personas", personas))
     app.add_handler(CommandHandler("grafana", grafana))
     app.add_handler(CommandHandler("formulario", formulario))
     app.run_polling()
