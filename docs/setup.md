@@ -92,6 +92,7 @@ FROM generate_series(
 ) AS d(fecha)
 CROSS JOIN persona p
 LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
+WHERE p.puede_examenes = true
 GROUP BY d.fecha, p.nombre
 ORDER BY d.fecha
 ```
@@ -102,6 +103,7 @@ ORDER BY d.fecha
 SELECT e.fecha AS time, p.nombre AS metric,
   SUM(SUM(e.num_examenes)) OVER (PARTITION BY p.nombre ORDER BY e.fecha) AS acumulado
 FROM examenes e JOIN persona p ON e.persona_id = p.id
+WHERE p.puede_examenes = true
 GROUP BY e.fecha, p.nombre
 ORDER BY e.fecha
 ```
@@ -117,6 +119,7 @@ FROM generate_series(
 ) AS d(fecha)
 CROSS JOIN persona p
 LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
+WHERE p.puede_examenes = true
 GROUP BY d.fecha, p.nombre
 ORDER BY d.fecha
 ```
@@ -127,6 +130,7 @@ ORDER BY d.fecha
 SELECT e.fecha AS time, p.nombre AS metric,
   SUM(SUM(e.num_aprobados)) OVER (PARTITION BY p.nombre ORDER BY e.fecha) AS acumulado
 FROM examenes e JOIN persona p ON e.persona_id = p.id
+WHERE p.puede_examenes = true
 GROUP BY e.fecha, p.nombre
 ORDER BY e.fecha
 ```
@@ -142,6 +146,7 @@ FROM generate_series(
 ) AS d(fecha)
 CROSS JOIN persona p
 LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
+WHERE p.puede_examenes = true
 GROUP BY d.fecha, p.nombre
 ORDER BY d.fecha
 ```
@@ -152,6 +157,7 @@ ORDER BY d.fecha
 SELECT e.fecha AS time, p.nombre AS metric,
   SUM(SUM(e.num_examenes - e.num_aprobados)) OVER (PARTITION BY p.nombre ORDER BY e.fecha) AS acumulado
 FROM examenes e JOIN persona p ON e.persona_id = p.id
+WHERE p.puede_examenes = true
 GROUP BY e.fecha, p.nombre
 ORDER BY e.fecha
 ```
@@ -162,7 +168,7 @@ ORDER BY e.fecha
 SELECT e.fecha AS time, p.nombre AS metric,
   ROUND(SUM(e.num_aprobados)::numeric / SUM(e.num_examenes) * 100, 1) AS ratio
 FROM examenes e JOIN persona p ON e.persona_id = p.id
-WHERE $__timeFilter(e.fecha)
+WHERE p.puede_examenes = true AND $__timeFilter(e.fecha)
 GROUP BY e.fecha, p.nombre
 ORDER BY e.fecha
 ```
@@ -178,6 +184,7 @@ FROM (
     SUM(e.num_aprobados) AS aprobados,
     SUM(e.num_examenes) AS examenes
   FROM examenes e JOIN persona p ON e.persona_id = p.id
+  WHERE p.puede_examenes = true
   GROUP BY e.fecha, p.nombre
 ) sub
 WINDOW w AS (PARTITION BY metric ORDER BY fecha)
