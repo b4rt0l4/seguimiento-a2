@@ -80,90 +80,59 @@ Este documento explica como registrarse en cada servicio, configurar las credenc
 
 Ir a **Dashboards > New Dashboard**. Para cada panel: Add visualization, seleccionar datasource PostgreSQL, cambiar a modo **Code** y pegar la query.
 
-Nota sobre paneles con barras (Bar chart): para que muestren todas las fechas del rango (incluso sin datos), las queries usan `generate_series` + `CROSS JOIN persona` + `LEFT JOIN examenes` con `COALESCE(..., 0)`.
+Nota sobre paneles con barras: usar **Bar chart** con Format: **Time series**, Stacking: **Normal**. Para que muestren todas las fechas del rango (incluso sin datos), las queries usan `generate_series` + `CROSS JOIN persona` + `LEFT JOIN` con `COALESCE(..., 0)`. El formato Time series hace que Grafana use la columna `metric` para nombrar las series en la leyenda. En todos los paneles activar **Show values**: **Always** para mostrar los valores sin necesidad de hover.
 
-#### Panel 1 — Examenes por dia
+#### Panel 1 — Examenes por dia (aprobados + suspensos)
 ```sql
-SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(e.num_examenes), 0) AS examenes
+SELECT d.fecha::date AS time,
+  p.nombre || ' - Aprobados' AS metric,
+  COALESCE(SUM(e.num_aprobados), 0) AS valor
 FROM generate_series(
-  $__timeFrom()::date,
-  $__timeTo()::date,
-  '1 day'::interval
+  $__timeFrom()::date, $__timeTo()::date, '1 day'::interval
 ) AS d(fecha)
 CROSS JOIN persona p
 LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
 WHERE p.puede_examenes = true
 GROUP BY d.fecha, p.nombre
-ORDER BY d.fecha
-```
-- Visualization: **Bar chart**
 
-#### Panel 2 — Examenes acumulado total
-```sql
-SELECT e.fecha AS time, p.nombre AS metric,
-  SUM(SUM(e.num_examenes)) OVER (PARTITION BY p.nombre ORDER BY e.fecha) AS acumulado
-FROM examenes e JOIN persona p ON e.persona_id = p.id
-WHERE p.puede_examenes = true
-GROUP BY e.fecha, p.nombre
-ORDER BY e.fecha
-```
-- Visualization: **Time series**, Connect null values: **Always**
+UNION ALL
 
-#### Panel 3 — Aprobados por dia
-```sql
-SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(e.num_aprobados), 0) AS aprobados
+SELECT d.fecha::date AS time,
+  p.nombre || ' - Suspensos' AS metric,
+  COALESCE(SUM(e.num_examenes - e.num_aprobados), 0) AS valor
 FROM generate_series(
-  $__timeFrom()::date,
-  $__timeTo()::date,
-  '1 day'::interval
+  $__timeFrom()::date, $__timeTo()::date, '1 day'::interval
 ) AS d(fecha)
 CROSS JOIN persona p
 LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
 WHERE p.puede_examenes = true
 GROUP BY d.fecha, p.nombre
-ORDER BY d.fecha
-```
-- Visualization: **Bar chart**
 
-#### Panel 4 — Aprobados acumulado total
+ORDER BY time
+```
+- Visualization: **Bar chart**, Format: **Time series**, Stacking: **Normal**
+
+#### Panel 2 — Examenes acumulado (aprobados + suspensos)
 ```sql
-SELECT e.fecha AS time, p.nombre AS metric,
+SELECT e.fecha AS time, p.nombre || ' - Aprobados' AS metric,
   SUM(SUM(e.num_aprobados)) OVER (PARTITION BY p.nombre ORDER BY e.fecha) AS acumulado
 FROM examenes e JOIN persona p ON e.persona_id = p.id
 WHERE p.puede_examenes = true
 GROUP BY e.fecha, p.nombre
-ORDER BY e.fecha
-```
-- Visualization: **Time series**, Connect null values: **Always**
 
-#### Panel 5 — Suspensos por dia
-```sql
-SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(e.num_examenes - e.num_aprobados), 0) AS suspensos
-FROM generate_series(
-  $__timeFrom()::date,
-  $__timeTo()::date,
-  '1 day'::interval
-) AS d(fecha)
-CROSS JOIN persona p
-LEFT JOIN examenes e ON e.fecha = d.fecha AND e.persona_id = p.id
-WHERE p.puede_examenes = true
-GROUP BY d.fecha, p.nombre
-ORDER BY d.fecha
-```
-- Visualization: **Bar chart**
+UNION ALL
 
-#### Panel 6 — Suspensos acumulado total
-```sql
-SELECT e.fecha AS time, p.nombre AS metric,
+SELECT e.fecha AS time, p.nombre || ' - Suspensos' AS metric,
   SUM(SUM(e.num_examenes - e.num_aprobados)) OVER (PARTITION BY p.nombre ORDER BY e.fecha) AS acumulado
 FROM examenes e JOIN persona p ON e.persona_id = p.id
 WHERE p.puede_examenes = true
 GROUP BY e.fecha, p.nombre
-ORDER BY e.fecha
-```
-- Visualization: **Time series**, Connect null values: **Always**
 
-#### Panel 7 — Ratio aprobados por dia (%)
+ORDER BY time
+```
+- Visualization: **Time series**, Connect null values: **Always**, Stacking: **Off**
+
+#### Panel 3 — Ratio aprobados por dia (%)
 ```sql
 SELECT e.fecha AS time, p.nombre AS metric,
   ROUND(SUM(e.num_aprobados)::numeric / SUM(e.num_examenes) * 100, 1) AS ratio
@@ -175,7 +144,7 @@ ORDER BY e.fecha
 - Visualization: **Time series**, Connect null values: **Always**
 - Standard options > Unit: **Misc > Percent (0-100)**
 
-#### Panel 8 — Ratio aprobados acumulado (%)
+#### Panel 4 — Ratio aprobados acumulado (%)
 ```sql
 SELECT fecha AS time, metric,
   ROUND(SUM(aprobados) OVER w::numeric / SUM(examenes) OVER w * 100, 1) AS ratio
@@ -193,13 +162,12 @@ ORDER BY fecha
 - Visualization: **Time series**, Connect null values: **Always**
 - Standard options > Unit: **Misc > Percent (0-100)**
 
-#### Panel 9 — Aciertos pregunta del dia por dia
+#### Panel 5 — Acertadas por dia
 ```sql
-SELECT d.fecha::date AS time, p.nombre AS metric, COALESCE(SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END), 0) AS aciertos
+SELECT d.fecha::date AS time, p.nombre AS metric,
+  COALESCE(SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END), 0) AS acertadas
 FROM generate_series(
-  $__timeFrom()::date,
-  $__timeTo()::date,
-  '1 day'::interval
+  $__timeFrom()::date, $__timeTo()::date, '1 day'::interval
 ) AS d(fecha)
 CROSS JOIN persona p
 LEFT JOIN pregunta_dia q ON q.fecha = d.fecha AND q.persona_id = p.id
@@ -207,9 +175,10 @@ WHERE p.puede_pregunta = true
 GROUP BY d.fecha, p.nombre
 ORDER BY d.fecha
 ```
-- Visualization: **Bar chart**
+- Visualization: **Bar chart**, Format: **Time series**, Stacking: **Normal**
+- Standard options > Decimals: **0**
 
-#### Panel 10 — Aciertos pregunta del dia acumulado
+#### Panel 6 — Acertadas acumulado
 ```sql
 SELECT q.fecha AS time, p.nombre AS metric,
   SUM(SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END)) OVER (PARTITION BY p.nombre ORDER BY q.fecha) AS acumulado
@@ -218,35 +187,34 @@ GROUP BY q.fecha, p.nombre
 ORDER BY q.fecha
 ```
 - Visualization: **Time series**, Connect null values: **Always**
+- Standard options > Decimals: **0**
 
-#### Panel 11 — Ratio aciertos pregunta del dia (%)
+#### Panel 7 — Falladas por dia
+```sql
+SELECT d.fecha::date AS time, p.nombre AS metric,
+  COALESCE(SUM(CASE WHEN q.acertada = false THEN 1 ELSE 0 END), 0) AS falladas
+FROM generate_series(
+  $__timeFrom()::date, $__timeTo()::date, '1 day'::interval
+) AS d(fecha)
+CROSS JOIN persona p
+LEFT JOIN pregunta_dia q ON q.fecha = d.fecha AND q.persona_id = p.id
+WHERE p.puede_pregunta = true
+GROUP BY d.fecha, p.nombre
+ORDER BY d.fecha
+```
+- Visualization: **Bar chart**, Format: **Time series**, Stacking: **Normal**
+- Standard options > Decimals: **0**
+
+#### Panel 8 — Falladas acumulado
 ```sql
 SELECT q.fecha AS time, p.nombre AS metric,
-  ROUND(SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100, 1) AS ratio
+  SUM(SUM(CASE WHEN q.acertada = false THEN 1 ELSE 0 END)) OVER (PARTITION BY p.nombre ORDER BY q.fecha) AS acumulado
 FROM pregunta_dia q JOIN persona p ON q.persona_id = p.id
-WHERE $__timeFilter(q.fecha)
 GROUP BY q.fecha, p.nombre
 ORDER BY q.fecha
 ```
 - Visualization: **Time series**, Connect null values: **Always**
-- Standard options > Unit: **Misc > Percent (0-100)**
-
-#### Panel 12 — Ratio aciertos pregunta del dia acumulado (%)
-```sql
-SELECT fecha AS time, metric,
-  ROUND(SUM(aciertos) OVER w::numeric / SUM(total) OVER w * 100, 1) AS ratio
-FROM (
-  SELECT q.fecha, p.nombre AS metric,
-    SUM(CASE WHEN q.acertada THEN 1 ELSE 0 END) AS aciertos,
-    COUNT(*) AS total
-  FROM pregunta_dia q JOIN persona p ON q.persona_id = p.id
-  GROUP BY q.fecha, p.nombre
-) sub
-WINDOW w AS (PARTITION BY metric ORDER BY fecha)
-ORDER BY fecha
-```
-- Visualization: **Time series**, Connect null values: **Always**
-- Standard options > Unit: **Misc > Percent (0-100)**
+- Standard options > Decimals: **0**
 
 ### Configurar dashboard
 - Rango de tiempo por defecto: seleccionar **Last 7 days** y al guardar marcar **"Save current time range as dashboard default"**

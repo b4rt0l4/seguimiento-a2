@@ -57,22 +57,18 @@ fecha DATE NOT NULL, acertada BOOLEAN NOT NULL
 - Body JSON: `{ "persona": "nombre", "fecha": "YYYY-MM-DD", "acertada": true/false }`
 - Variable de entorno `API_KEY` en `.env`
 
-### Graficas en Grafana
-#### Examenes (8 paneles)
-1. **Examenes por dia**: barras por persona y fecha (Bar chart, generate_series)
-2. **Examenes acumulado**: linea continua por persona (Time series, Connect null values: Always)
-3. **Aprobados por dia**: barras por persona y fecha (Bar chart, generate_series)
-4. **Aprobados acumulado**: linea continua por persona
-5. **Suspensos por dia**: calculado como num_examenes - num_aprobados (Bar chart, generate_series)
-6. **Suspensos acumulado**: linea continua por persona
-7. **Ratio aprobados por dia (%)**: porcentaje diario por persona
-8. **Ratio aprobados acumulado (%)**: evolucion del porcentaje global por persona
+### Graficas en Grafana (8 paneles)
+#### Examenes (4 paneles)
+1. **Examenes por dia**: barras apiladas aprobados + suspensos por persona (Bar chart, Stacking: Normal)
+2. **Examenes acumulado**: lineas apiladas aprobados + suspensos por persona (Time series, Stacking: Normal)
+3. **Ratio aprobados por dia (%)**: porcentaje diario por persona (Time series)
+4. **Ratio aprobados acumulado (%)**: evolucion del porcentaje global por persona (Time series)
 
 #### Pregunta del dia (4 paneles)
-9. **Aciertos por dia**: barras con aciertos/fallos por persona y fecha
-10. **Aciertos acumulado**: linea continua con total de aciertos por persona
-11. **Ratio aciertos por dia (%)**: porcentaje de acierto diario por persona
-12. **Ratio aciertos acumulado (%)**: evolucion del porcentaje global por persona
+5. **Acertadas por dia**: barras por persona y fecha (Bar chart)
+6. **Acertadas acumulado**: linea continua por persona (Time series)
+7. **Falladas por dia**: barras por persona y fecha (Bar chart)
+8. **Falladas acumulado**: linea continua por persona (Time series)
 
 Nota sobre paneles con barras: para que respeten el rango de tiempo del dashboard, usar visualizacion Time series con estilo Bars (no Bar chart).
 Para que las lineas no tengan saltos en dias sin datos: Connect null values = Always.
