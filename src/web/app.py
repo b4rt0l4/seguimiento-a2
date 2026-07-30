@@ -95,7 +95,7 @@ async def api_pregunta(request: Request, authorization: str = Header(None)):
     try:
         fecha = date.fromisoformat(fecha_str)
     except ValueError:
-        return JSONResponse({"error": "Formato de fecha invalido. Usa YYYY-MM-DD"}, status_code=400)
+        return JSONResponse({"error": f"{fecha_str} no es un formato de fecha válido. Usa YYYY-MM-DD"}, status_code=400)
 
     if fecha > datetime.now(ZoneInfo("Europe/Madrid")).date():
         return JSONResponse({"error": "La fecha no puede ser posterior a hoy"}, status_code=400)
